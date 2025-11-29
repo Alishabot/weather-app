@@ -4,9 +4,7 @@
 
 // API Configuration
 const API_CONFIG = {
-    BASE_URL: 'https://api.openweathermap.org/data/2.5',
-    GEO_URL: 'https://api.openweathermap.org/geo/1.0',
-    PROXY_URL: 'https://api.allorigins.win/raw?url=',
+    BASE_URL: '/api/weather',
     API_KEY: '42e6e8424170dc2c2a166bac7f1fa180',
     UNITS: 'metric', // 'metric' (°C, km/h) sau 'imperial' (°F, mph)
     LANG: 'ro', // Limba pentru descrieri
@@ -167,8 +165,8 @@ class WeatherAPIService {
 
     // Construiește URL-ul complet pentru apel API
     buildUrl(endpoint, params) {
-        const url = new URL(endpoint, API_CONFIG.BASE_URL);
-        url.searchParams.append('appid', API_CONFIG.API_KEY);
+        const url = new URL(API_CONFIG.BASE_URL, window.location.origin);
+        url.searchParams.append('endpoint', endpoint);
         url.searchParams.append('units', API_CONFIG.UNITS);
         url.searchParams.append('lang', API_CONFIG.LANG);
         
@@ -178,8 +176,7 @@ class WeatherAPIService {
             }
         });
         
-        // Use CORS proxy with URL encoding
-        return API_CONFIG.PROXY_URL + encodeURIComponent(url.toString());
+        return url.toString();
     }
 
     // Preluare date meteo CURENTE după coordonate (endpoint /weather)
@@ -261,18 +258,15 @@ class WeatherAPIService {
         }
 
         try {
-            // Construiți URL manual pentru daily forecast
-            const url = new URL('/forecast/daily', API_CONFIG.BASE_URL);
+            const url = new URL(API_CONFIG.BASE_URL, window.location.origin);
+            url.searchParams.append('endpoint', 'forecast/daily');
             url.searchParams.append('lat', lat);
             url.searchParams.append('lon', lon);
             url.searchParams.append('cnt', '7'); // 7 zile
-            url.searchParams.append('appid', API_CONFIG.API_KEY);
             url.searchParams.append('units', API_CONFIG.UNITS);
             url.searchParams.append('lang', API_CONFIG.LANG);
             
-            // Use CORS proxy
-            const proxiedUrl = API_CONFIG.PROXY_URL + encodeURIComponent(url.toString());
-            const response = await fetch(proxiedUrl);
+            const response = await fetch(url.toString());
             
             if (!response.ok) {
                 // Fallback: Dacă daily nu este disponibil, folosim /forecast
@@ -333,14 +327,12 @@ class WeatherAPIService {
         }
 
         try {
-            const url = new URL('/direct', API_CONFIG.GEO_URL);
+            const url = new URL(API_CONFIG.BASE_URL, window.location.origin);
+            url.searchParams.append('endpoint', 'direct');
             url.searchParams.append('q', cityName);
             url.searchParams.append('limit', '5');
-            url.searchParams.append('appid', API_CONFIG.API_KEY);
             
-            // Use CORS proxy for geocoding
-            const proxiedUrl = API_CONFIG.PROXY_URL + encodeURIComponent(url.toString());
-            const response = await fetch(proxiedUrl);
+            const response = await fetch(url.toString());
             
             if (!response.ok) {
                 throw new Error(`API Error: ${response.status} ${response.statusText}`);
