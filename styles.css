@@ -493,6 +493,7 @@ body {
     padding: var(--spacing-2xl);
     box-shadow: var(--shadow-lg);
     position: relative;
+    margin-top: 2rem;
 }
 
 .forecast-section::before {
@@ -509,23 +510,11 @@ body {
     display: block;
 }
 
-.forecast-section h3 {
-    font-size: 1.75rem;
-    margin-bottom: var(--spacing-xl);
-    color: var(--text);
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
-}
-
-.forecast-section h3 i {
-    color: var(--warning);
-}
-
 .forecast-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
     gap: var(--spacing-lg);
+    margin-top: 0;
 }
 
 .forecast-card {
