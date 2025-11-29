@@ -4,8 +4,8 @@
 
 // API Configuration
 const API_CONFIG = {
-    BASE_URL: '/api/weather',
-    API_KEY: '42e6e8424170dc2c2a166bac7f1fa180',
+    BASE_URL: 'https://api.open-meteo.com/v1',
+    GEOCODING_URL: 'https://geocoding-api.open-meteo.com/v1',
     UNITS: 'metric', // 'metric' (°C, km/h) sau 'imperial' (°F, mph)
     LANG: 'ro', // Limba pentru descrieri
     FORECAST_DAYS: 7 // Prognoză pe 7 zile
@@ -163,211 +163,99 @@ class WeatherAPIService {
         this.cache = new CacheManager();
     }
 
-    // Construiește URL-ul complet pentru apel API
-    buildUrl(endpoint, params) {
-        const url = new URL(API_CONFIG.BASE_URL, window.location.origin);
-        url.searchParams.append('endpoint', endpoint);
-        url.searchParams.append('units', API_CONFIG.UNITS);
-        url.searchParams.append('lang', API_CONFIG.LANG);
-        
-        Object.entries(params).forEach(([key, value]) => {
-            if (value !== undefined) {
-                url.searchParams.append(key, value);
-            }
-        });
-        
-        return url.toString();
-    }
-
-    // Preluare date meteo CURENTE după coordonate (endpoint /weather)
+    // Get current weather by coordinates using Open-Meteo
     async getWeatherByCoords(lat, lon) {
         const cacheKey = `weather_${lat}_${lon}`;
         
-        // Verifică cache
         if (this.cache.has(cacheKey)) {
             console.log('✓ Meteo curentă preluată din cache:', { lat, lon });
             return this.cache.get(cacheKey);
         }
 
         try {
-            const url = this.buildUrl('/weather', { lat, lon });
-            const response = await fetch(url);
+            const url = new URL(`${API_CONFIG.BASE_URL}/forecast`, window.location.origin);
+            url.href = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,weather_description,wind_speed_10m,pressure_msl&timezone=auto`;
             
-            if (!response.ok) {
-                throw new Error(`API Error: ${response.status} ${response.statusText}`);
-            }
-
+            const response = await fetch(url.href);
+            if (!response.ok) throw new Error(`API Error: ${response.status}`);
+            
             const data = await response.json();
-            
-            // Validare câmpuri importante
-            this.validateWeatherData(data);
-            
-            // Salvează în cache
             this.cache.set(cacheKey, data);
             
-            console.log('✓ Meteo curentă preluată din API:', {
-                city: data.name,
-                temp: data.main.temp,
-                icon: data.weather[0].icon
-            });
-            
+            console.log('✓ Meteo curentă preluată din API');
             return data;
         } catch (error) {
             throw this.handleError(error, 'obținerea datelor meteo curente');
         }
     }
 
-    // Preluare PROGNOZE pe 5 zile (3h interval - endpoint /forecast)
+    // Get forecast by coordinates using Open-Meteo
     async getForecast5Days(lat, lon) {
         const cacheKey = `forecast5_${lat}_${lon}`;
         
         if (this.cache.has(cacheKey)) {
-            console.log('✓ Prognoză 5 zile preluată din cache:', { lat, lon });
+            console.log('✓ Prognoză preluată din cache:', { lat, lon });
             return this.cache.get(cacheKey);
         }
 
         try {
-            const url = this.buildUrl('/forecast', { lat, lon });
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto&forecast_days=7`;
+            
             const response = await fetch(url);
+            if (!response.ok) throw new Error(`API Error: ${response.status}`);
             
-            if (!response.ok) {
-                throw new Error(`API Error: ${response.status} ${response.statusText}`);
-            }
-
             const data = await response.json();
             this.cache.set(cacheKey, data);
             
-            console.log('✓ Prognoză 5 zile preluată din API:', {
-                total_forecasts: data.list.length,
-                days_covered: Math.ceil(data.list.length / 8)
-            });
-            
+            console.log('✓ Prognoză preluată din API');
             return data;
         } catch (error) {
-            throw this.handleError(error, 'obținerea prognozei pe 5 zile');
+            throw this.handleError(error, 'obținerea prognozei');
         }
     }
 
-    // Preluare PROGNOZE pe 7 zile (daily - endpoint /forecast/daily)
+    // Alias for compatibility
     async getForecast7Days(lat, lon) {
-        const cacheKey = `forecast7_${lat}_${lon}`;
-        
-        if (this.cache.has(cacheKey)) {
-            console.log('✓ Prognoză 7 zile preluată din cache:', { lat, lon });
-            return this.cache.get(cacheKey);
-        }
-
-        try {
-            const url = new URL(API_CONFIG.BASE_URL, window.location.origin);
-            url.searchParams.append('endpoint', 'forecast/daily');
-            url.searchParams.append('lat', lat);
-            url.searchParams.append('lon', lon);
-            url.searchParams.append('cnt', '7'); // 7 zile
-            url.searchParams.append('units', API_CONFIG.UNITS);
-            url.searchParams.append('lang', API_CONFIG.LANG);
-            
-            const response = await fetch(url.toString());
-            
-            if (!response.ok) {
-                // Fallback: Dacă daily nu este disponibil, folosim /forecast
-                console.warn('Endpoint /forecast/daily nu disponibil, folosind /forecast');
-                return await this.getForecast5Days(lat, lon);
-            }
-
-            const data = await response.json();
-            this.cache.set(cacheKey, data);
-            
-            console.log('✓ Prognoză 7 zile preluată din API:', {
-                days: data.list.length
-            });
-            
-            return data;
-        } catch (error) {
-            // Fallback la 5-day forecast
-            console.warn('Eroare la prognoța 7 zile, folosind 5 zile:', error);
-            return await this.getForecast5Days(lat, lon);
-        }
+        return this.getForecast5Days(lat, lon);
     }
 
-    // Validare câmpuri esențiale din API response
-    validateWeatherData(data) {
-        const requiredFields = [
-            'main.temp',
-            'main.feels_like',
-            'main.humidity',
-            'main.pressure',
-            'wind.speed',
-            'weather[0].description',
-            'weather[0].icon',
-            'name',
-            'dt'
-        ];
-
-        requiredFields.forEach(field => {
-            const value = this.getNestedValue(data, field);
-            if (value === undefined || value === null) {
-                console.warn(`⚠️ Câmp lipsă din API response: ${field}`);
-            }
-        });
-    }
-
-    // Utilitar pentru a accesa nested object properties
-    getNestedValue(obj, path) {
-        return path.split(/[\.\[\]]/).filter(Boolean).reduce((current, key) => 
-            current?.[key], obj);
-    }
-
-    // Geocodificare (caut coordonate după nume oraș)
+    // Geocode city name to coordinates
     async getCoordinatesByCity(cityName) {
         const cacheKey = `coords_${cityName.toLowerCase()}`;
         
         if (this.cache.has(cacheKey)) {
-            console.log('Coordonate preluate din cache pentru:', cityName);
+            console.log('✓ Coordonate preluate din cache:', cityName);
             return this.cache.get(cacheKey);
         }
 
         try {
-            const url = new URL(API_CONFIG.BASE_URL, window.location.origin);
-            url.searchParams.append('endpoint', 'direct');
-            url.searchParams.append('q', cityName);
-            url.searchParams.append('limit', '5');
+            const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=5&language=en&format=json`;
             
-            const response = await fetch(url.toString());
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`API Error: ${response.status}`);
             
-            if (!response.ok) {
-                throw new Error(`API Error: ${response.status} ${response.statusText}`);
-            }
-
             const data = await response.json();
             
-            if (data.length === 0) {
+            if (!data.results || data.results.length === 0) {
                 throw new Error(`Niciun rezultat găsit pentru "${cityName}"`);
             }
 
-            this.cache.set(cacheKey, data);
-            
-            return data;
+            this.cache.set(cacheKey, data.results);
+            return data.results;
         } catch (error) {
             throw this.handleError(error, `căutarea orașului "${cityName}"`);
         }
     }
 
-    // Gestionare erori API
+    // Error handling
     handleError(error, action) {
         let userMessage = `Eroare la ${action}`;
         let errorType = 'error';
 
         if (error instanceof TypeError) {
             userMessage = 'Eroare de conexiune. Verificați conexiunea la internet.';
-            errorType = 'error';
-        } else if (error.message.includes('API Error: 401')) {
-            userMessage = 'Cheie API invalidă. Configurați cheia în app.js';
-            errorType = 'error';
-        } else if (error.message.includes('API Error: 404')) {
+        } else if (error.message.includes('404')) {
             userMessage = 'Orașul nu a fost găsit. Încercați cu alt nume.';
-            errorType = 'warning';
-        } else if (error.message.includes('API Error: 429')) {
-            userMessage = 'Prea multe cereri. Așteptați câteva secunde și încercați din nou.';
             errorType = 'warning';
         } else if (error.message.includes('Niciun rezultat')) {
             userMessage = error.message;
@@ -376,10 +264,7 @@ class WeatherAPIService {
 
         const customError = new Error(userMessage);
         customError.type = errorType;
-        customError.originalError = error;
-
-        console.error('API Error Details:', error);
-
+        console.error('API Error:', error);
         return customError;
     }
 }
@@ -543,13 +428,14 @@ class WeatherApp {
         suggestions.innerHTML = '';
 
         results.forEach(result => {
-            const displayName = `${result.name}${result.state ? ', ' + result.state : ''}, ${result.country}`;
+            // Open-Meteo format: name, admin1 (state/province), country
+            const displayName = `${result.name}${result.admin1 ? ', ' + result.admin1 : ''}, ${result.country}`;
             
             const item = document.createElement('div');
             item.className = 'suggestion-item';
             item.textContent = displayName;
-            item.dataset.lat = result.lat;
-            item.dataset.lon = result.lon;
+            item.dataset.lat = result.latitude;
+            item.dataset.lon = result.longitude;
             item.dataset.name = result.name;
             
             item.addEventListener('click', () => {
@@ -562,15 +448,11 @@ class WeatherApp {
         suggestions.classList.add('active');
     }
 
-    hideSuggestions() {
-        DOM_MAPPING.search.suggestions.classList.remove('active');
-        DOM_MAPPING.search.suggestions.innerHTML = '';
-    }
-
     selectSuggestion(result) {
         DOM_MAPPING.search.input.value = result.name;
+        this.lastCity = result.name;
         this.hideSuggestions();
-        this.currentCoordinates = { lat: result.lat, lon: result.lon, name: result.name };
+        this.currentCoordinates = { lat: result.latitude, lon: result.longitude, name: result.name };
         this.fetchWeatherData();
     }
 
@@ -596,23 +478,24 @@ class WeatherApp {
             this.showLoading(true);
             this.hideError();
 
-            // Obține coordonate dacă nu sunt setate
+            // Get coordinates if not set
             if (!this.currentCoordinates && cityName) {
                 const results = await this.api.getCoordinatesByCity(cityName);
                 const result = results[0];
                 this.currentCoordinates = { 
-                    lat: result.lat, 
-                    lon: result.lon, 
+                    lat: result.latitude, 
+                    lon: result.longitude, 
                     name: result.name 
                 };
+                this.lastCity = result.name;
             }
 
             if (!this.currentCoordinates) {
                 throw new Error('Coordonate indisponibile');
             }
 
-            // Paralel: fetch weather, 5-day forecast și 7-day forecast
-            const [weatherData, forecastData5, forecastData7] = await Promise.all([
+            // Parallel fetch: weather and forecast
+            const [weatherData, forecastData] = await Promise.all([
                 this.api.getWeatherByCoords(
                     this.currentCoordinates.lat, 
                     this.currentCoordinates.lon
@@ -620,19 +503,24 @@ class WeatherApp {
                 this.api.getForecast5Days(
                     this.currentCoordinates.lat, 
                     this.currentCoordinates.lon
-                ),
-                this.api.getForecast7Days(
-                    this.currentCoordinates.lat, 
-                    this.currentCoordinates.lon
                 )
             ]);
 
-            // Afișează datele cu unitățile alese
+            // Display data
             this.displayCurrentWeather(weatherData);
-            this.displayForecast(forecastData7 || forecastData5);
+            this.displayForecast(forecastData);
 
-            // Adaugă în recent searches
+            // Add to recent searches
             this.addToRecentSearches(this.currentCoordinates.name);
+            
+            console.log('✓ Datele meteo au fost încărcate cu succes');
+        } catch (error) {
+            console.error('Fetch error:', error);
+            this.showError(error.message || 'Eroare la încărcarea datelor', error.type || 'error');
+        } finally {
+            this.showLoading(false);
+        }
+    }
 
             // Succes
             this.showLoading(false);
@@ -649,59 +537,43 @@ class WeatherApp {
     // ========================================================================
 
     displayCurrentWeather(data) {
-        // Mapează câmpurile API direct la variabile locale
-        // main.temp → temperatura curentă
-        // main.feels_like → feels-like temperature
-        // main.humidity → umiditate
-        // main.pressure → presiune
-        // wind.speed → viteza vântului (m/s - trebuie convertite)
-        // weather[0].description → descriere meteo
-        // weather[0].icon → icon meteo
-        // dt → timestamp
-        
-        const city = data.name;
-        const tempCelsius = data.main.temp;
-        const feelsLikeCelsius = data.main.feels_like;
-        const humidity = data.main.humidity;
-        const pressure = data.main.pressure;
-        const windSpeedMs = data.wind.speed;
-        const description = data.weather[0].description;
-        const icon = this.getWeatherIcon(data.weather[0].icon);
-        const date = this.formatDate(new Date(data.dt * 1000));
+        // Open-Meteo current data structure
+        const current = data.current;
+        const tempCelsius = current.temperature_2m;
+        const humidity = current.relative_humidity_2m;
+        const pressure = current.pressure_msl;
+        const windSpeedMs = current.wind_speed_10m;
+        const description = current.weather_description || 'Clear';
+        const date = this.formatDate(new Date());
 
-        // Conversii unități
+        // Unit conversions
         const temp = this.units.temperature(tempCelsius);
-        const feelsLike = this.units.temperature(feelsLikeCelsius);
-        const windSpeed = this.units.windSpeed(windSpeedMs);
+        const windSpeed = this.units.windSpeed(windSpeedMs / 3.6); // Convert km/h to m/s
         const tempUnit = this.units.tempUnit();
         const windUnit = this.units.windUnit();
 
-        // Actualizează DOM cu valorile mapate și convertite
-        DOM_MAPPING.currentWeather.cityName.textContent = city;
+        // Update DOM
+        DOM_MAPPING.currentWeather.cityName.textContent = this.lastCity || 'Weather';
         DOM_MAPPING.currentWeather.temperature.textContent = `${temp}${tempUnit}`;
         DOM_MAPPING.currentWeather.description.textContent = description;
-        DOM_MAPPING.currentWeather.icon.src = icon;
-        DOM_MAPPING.currentWeather.icon.alt = description;
         DOM_MAPPING.currentWeather.date.textContent = date;
+        
+        // Use a generic weather icon
+        DOM_MAPPING.currentWeather.icon.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="30" r="20" fill="%23FFD700"/><path d="M20 50 Q20 65 35 70 Q50 75 50 75 Q50 75 65 70 Q80 65 80 50" fill="%2387CEEB"/></svg>';
+        DOM_MAPPING.currentWeather.icon.alt = description;
 
-        // Actualizează detalii cu unitățile corecte
         DOM_MAPPING.currentWeather.details.windSpeed.textContent = `${windSpeed} ${windUnit}`;
         DOM_MAPPING.currentWeather.details.humidity.textContent = `${humidity}%`;
-        DOM_MAPPING.currentWeather.details.feelsLike.textContent = `${feelsLike}${tempUnit}`;
-        DOM_MAPPING.currentWeather.details.pressure.textContent = `${pressure} ${this.units.pressureUnit()}`;
+        DOM_MAPPING.currentWeather.details.feelsLike.textContent = `${temp}${tempUnit}`;
+        DOM_MAPPING.currentWeather.details.pressure.textContent = `${Math.round(pressure)} hPa`;
 
-        // Log date mapate pentru debug
         console.log('📊 Meteo curentă afișată:', {
-            city,
             temperature: `${temp}${tempUnit}`,
-            feelsLike: `${feelsLike}${tempUnit}`,
             humidity: `${humidity}%`,
             pressure: `${pressure}hPa`,
-            windSpeed: `${windSpeed}${windUnit}`,
-            description
+            windSpeed: `${windSpeed}${windUnit}`
         });
 
-        // Afișează container
         DOM_MAPPING.currentWeather.container.classList.add('show');
     }
 
@@ -713,115 +585,76 @@ class WeatherApp {
         const container = DOM_MAPPING.forecast.container;
         container.innerHTML = '';
 
-        // Determină tipul de date: daily sau 3-hourly
-        const isDailyForecast = data.list && data.list[0] && data.list[0].main && !data.list[0].dt_txt;
-        
-        if (isDailyForecast) {
-            // Daily forecast (endpoint /forecast/daily)
-            this.displayDailyForecast(data.list, container);
-        } else {
-            // 3-hourly forecast (endpoint /forecast) - grupează după zi
-            this.display3HourlyForecast(data.list, container);
+        // Open-Meteo daily forecast
+        const daily = data.daily;
+        if (!daily || !daily.time) {
+            console.warn('No forecast data available');
+            return;
         }
 
+        // Display up to 7 days
+        for (let i = 0; i < Math.min(7, daily.time.length); i++) {
+            const card = document.createElement('div');
+            card.className = 'forecast-card';
+
+            const date = new Date(daily.time[i]);
+            const dateStr = date.toLocaleDateString('ro-RO', { 
+                weekday: 'short', 
+                month: 'short', 
+                day: 'numeric' 
+            });
+
+            const tempMax = this.units.temperature(daily.temperature_2m_max[i]);
+            const tempMin = this.units.temperature(daily.temperature_2m_min[i]);
+            const tempUnit = this.units.tempUnit();
+            const weatherCode = daily.weather_code[i];
+            const description = this.getWeatherDescription(weatherCode);
+
+            card.innerHTML = `
+                <div class="forecast-date">${dateStr}</div>
+                <div class="forecast-icon">⛅</div>
+                <div class="forecast-temp">
+                    <span class="forecast-temp-max">${tempMax}${tempUnit}</span>
+                    <span class="forecast-temp-min">${tempMin}${tempUnit}</span>
+                </div>
+                <div class="forecast-description">${description}</div>
+            `;
+
+            container.appendChild(card);
+        }
+
+        console.log(`✓ Prognoză ${Math.min(7, daily.time.length)} zile afișate`);
         DOM_MAPPING.forecast.section.classList.add('show');
     }
 
-    // Afișare prognoze zilnice (din endpoint /forecast/daily dacă disponibil)
-    displayDailyForecast(dailyForecasts, container) {
-        const forecastDays = dailyForecasts.slice(0, 7); // Maxim 7 zile
-
-        forecastDays.forEach(forecast => {
-            const card = document.createElement('div');
-            card.className = 'forecast-card';
-
-            const date = new Date(forecast.dt * 1000);
-            const dateStr = date.toLocaleDateString('ro-RO', { 
-                weekday: 'short', 
-                month: 'short', 
-                day: 'numeric' 
-            });
-
-            // Conversii unități pentru temperaturi
-            const tempMax = this.units.temperature(forecast.main.temp_max);
-            const tempMin = this.units.temperature(forecast.main.temp_min);
-            const tempUnit = this.units.tempUnit();
-            const description = forecast.weather[0].description;
-            const icon = this.getWeatherIcon(forecast.weather[0].icon);
-
-            card.innerHTML = `
-                <div class="forecast-date">${dateStr}</div>
-                <img class="forecast-icon" src="${icon}" alt="${description}">
-                <div class="forecast-temp">
-                    <span class="forecast-temp-max">${tempMax}${tempUnit}</span>
-                    <span class="forecast-temp-min">${tempMin}${tempUnit}</span>
-                </div>
-                <div class="forecast-description">${description}</div>
-            `;
-
-            container.appendChild(card);
-        });
-
-        console.log(`✓ Prognozeă ${forecastDays.length} zile afișate (daily forecast)`);
-    }
-
-    // Afișare prognoze din date 3-hourly (endpoint /forecast)
-    display3HourlyForecast(forecastList, container) {
-        // Grupează date după zi și iau primele datelor pentru fiecare zi (ideal la 12:00)
-        const dailyForecasts = {};
-        
-        forecastList.forEach(forecast => {
-            const date = new Date(forecast.dt * 1000);
-            const dayKey = date.toLocaleDateString('ro-RO');
-
-            // Iau doar forecast-ul cel mai apropiat de 12:00 pentru fiecare zi
-            if (!dailyForecasts[dayKey]) {
-                dailyForecasts[dayKey] = forecast;
-            } else {
-                const currentHour = date.getHours();
-                const existingHour = new Date(dailyForecasts[dayKey].dt * 1000).getHours();
-                
-                // Dacă noul forecast este mai apropiat de 12:00, înlocuiește
-                if (Math.abs(currentHour - 12) < Math.abs(existingHour - 12)) {
-                    dailyForecasts[dayKey] = forecast;
-                }
-            }
-        });
-
-        const forecastDays = Object.values(dailyForecasts).slice(0, 7);
-
-        forecastDays.forEach(forecast => {
-            const card = document.createElement('div');
-            card.className = 'forecast-card';
-
-            const date = new Date(forecast.dt * 1000);
-            const dateStr = date.toLocaleDateString('ro-RO', { 
-                weekday: 'short', 
-                month: 'short', 
-                day: 'numeric' 
-            });
-
-            // Conversii unități
-            const tempMax = this.units.temperature(forecast.main.temp_max);
-            const tempMin = this.units.temperature(forecast.main.temp_min);
-            const tempUnit = this.units.tempUnit();
-            const description = forecast.weather[0].description;
-            const icon = this.getWeatherIcon(forecast.weather[0].icon);
-
-            card.innerHTML = `
-                <div class="forecast-date">${dateStr}</div>
-                <img class="forecast-icon" src="${icon}" alt="${description}">
-                <div class="forecast-temp">
-                    <span class="forecast-temp-max">${tempMax}${tempUnit}</span>
-                    <span class="forecast-temp-min">${tempMin}${tempUnit}</span>
-                </div>
-                <div class="forecast-description">${description}</div>
-            `;
-
-            container.appendChild(card);
-        });
-
-        console.log(`✓ Prognoză ${forecastDays.length} zile afișate (3-hourly forecast)`);
+    // Convert WMO weather code to description
+    getWeatherDescription(code) {
+        const descriptions = {
+            0: 'Clear sky',
+            1: 'Mainly clear',
+            2: 'Partly cloudy',
+            3: 'Overcast',
+            45: 'Foggy',
+            48: 'Foggy',
+            51: 'Light drizzle',
+            53: 'Moderate drizzle',
+            55: 'Dense drizzle',
+            61: 'Slight rain',
+            63: 'Moderate rain',
+            65: 'Heavy rain',
+            71: 'Slight snow',
+            73: 'Moderate snow',
+            75: 'Heavy snow',
+            80: 'Slight showers',
+            81: 'Moderate showers',
+            82: 'Violent showers',
+            85: 'Slight snow showers',
+            86: 'Heavy snow showers',
+            95: 'Thunderstorm',
+            96: 'Thunderstorm with hail',
+            99: 'Thunderstorm with hail'
+        };
+        return descriptions[code] || 'Unknown';
     }
 
     // ========================================================================
