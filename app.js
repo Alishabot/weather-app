@@ -6,7 +6,7 @@
 const API_CONFIG = {
     BASE_URL: 'https://api.openweathermap.org/data/2.5',
     GEO_URL: 'https://api.openweathermap.org/geo/1.0',
-    PROXY_URL: 'https://cors-anywhere.herokuapp.com/',
+    PROXY_URL: 'https://api.allorigins.win/raw?url=',
     API_KEY: '42e6e8424170dc2c2a166bac7f1fa180',
     UNITS: 'metric', // 'metric' (°C, km/h) sau 'imperial' (°F, mph)
     LANG: 'ro', // Limba pentru descrieri
@@ -178,8 +178,8 @@ class WeatherAPIService {
             }
         });
         
-        // Use CORS proxy
-        return API_CONFIG.PROXY_URL + url.toString();
+        // Use CORS proxy with URL encoding
+        return API_CONFIG.PROXY_URL + encodeURIComponent(url.toString());
     }
 
     // Preluare date meteo CURENTE după coordonate (endpoint /weather)
@@ -271,7 +271,7 @@ class WeatherAPIService {
             url.searchParams.append('lang', API_CONFIG.LANG);
             
             // Use CORS proxy
-            const proxiedUrl = API_CONFIG.PROXY_URL + url.toString();
+            const proxiedUrl = API_CONFIG.PROXY_URL + encodeURIComponent(url.toString());
             const response = await fetch(proxiedUrl);
             
             if (!response.ok) {
@@ -339,7 +339,7 @@ class WeatherAPIService {
             url.searchParams.append('appid', API_CONFIG.API_KEY);
             
             // Use CORS proxy for geocoding
-            const proxiedUrl = API_CONFIG.PROXY_URL + url.toString();
+            const proxiedUrl = API_CONFIG.PROXY_URL + encodeURIComponent(url.toString());
             const response = await fetch(proxiedUrl);
             
             if (!response.ok) {
