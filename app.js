@@ -6,6 +6,7 @@
 const API_CONFIG = {
     BASE_URL: 'https://api.openweathermap.org/data/2.5',
     GEO_URL: 'https://api.openweathermap.org/geo/1.0',
+    PROXY_URL: 'https://cors-anywhere.herokuapp.com/',
     API_KEY: '42e6e8424170dc2c2a166bac7f1fa180',
     UNITS: 'metric', // 'metric' (°C, km/h) sau 'imperial' (°F, mph)
     LANG: 'ro', // Limba pentru descrieri
@@ -177,7 +178,8 @@ class WeatherAPIService {
             }
         });
         
-        return url.toString();
+        // Use CORS proxy
+        return API_CONFIG.PROXY_URL + url.toString();
     }
 
     // Preluare date meteo CURENTE după coordonate (endpoint /weather)
@@ -268,7 +270,9 @@ class WeatherAPIService {
             url.searchParams.append('units', API_CONFIG.UNITS);
             url.searchParams.append('lang', API_CONFIG.LANG);
             
-            const response = await fetch(url.toString());
+            // Use CORS proxy
+            const proxiedUrl = API_CONFIG.PROXY_URL + url.toString();
+            const response = await fetch(proxiedUrl);
             
             if (!response.ok) {
                 // Fallback: Dacă daily nu este disponibil, folosim /forecast
@@ -334,7 +338,9 @@ class WeatherAPIService {
             url.searchParams.append('limit', '5');
             url.searchParams.append('appid', API_CONFIG.API_KEY);
             
-            const response = await fetch(url.toString());
+            // Use CORS proxy for geocoding
+            const proxiedUrl = API_CONFIG.PROXY_URL + url.toString();
+            const response = await fetch(proxiedUrl);
             
             if (!response.ok) {
                 throw new Error(`API Error: ${response.status} ${response.statusText}`);
