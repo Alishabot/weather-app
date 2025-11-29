@@ -498,21 +498,16 @@ class WeatherApp {
                 throw new Error('Coordonate indisponibile');
             }
 
-            // Parallel fetch: weather and forecast
-            const [weatherData, forecastData] = await Promise.all([
-                this.api.getWeatherByCoords(
-                    this.currentCoordinates.lat, 
-                    this.currentCoordinates.lon
-                ),
-                this.api.getForecast5Days(
-                    this.currentCoordinates.lat, 
-                    this.currentCoordinates.lon
-                )
-            ]);
+            // Parallel fetch: weather only (no forecast)
+            const weatherData = await this.api.getWeatherByCoords(
+                this.currentCoordinates.lat, 
+                this.currentCoordinates.lon
+            );
 
             // Display data
             this.displayCurrentWeather(weatherData);
-            this.displayForecast(forecastData);
+            // Skip forecast display - not showing forecast details
+            // this.displayForecast(forecastData);
 
             // Add to recent searches
             this.addToRecentSearches(this.currentCoordinates.name);
