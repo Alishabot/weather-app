@@ -1,18 +1,17 @@
 // ============================================================================
-// WEATHER APP - MAIN APPLICATION
+// WEATHER APP - Complete Responsive Weather Application
 // ============================================================================
 
-// API Configuration
 const API_CONFIG = {
     BASE_URL: 'https://api.open-meteo.com/v1',
     GEOCODING_URL: 'https://geocoding-api.open-meteo.com/v1',
-    UNITS: 'metric', // 'metric' (°C, km/h) sau 'imperial' (°F, mph)
-    LANG: 'ro', // Limba pentru descrieri
-    FORECAST_DAYS: 7 // Prognoză pe 7 zile
+    UNITS: 'metric',
+    LANG: 'ro',
+    FORECAST_DAYS: 7
 };
 
 // ============================================================================
-// UNITS CONVERSION UTILITY - Conversii între metric și imperial
+// UNITS CONVERTER
 // ============================================================================
 
 class UnitsConverter {
@@ -24,122 +23,83 @@ class UnitsConverter {
         this.units = units;
     }
 
-    // Conversie temperatură
     temperature(celsius) {
-        if (this.units === 'imperial') {
-            return Math.round((celsius * 9/5) + 32);
-        }
-        return Math.round(celsius);
+        return this.units === 'imperial' ? Math.round((celsius * 9/5) + 32) : Math.round(celsius);
     }
 
-    // Conversie vânt (m/s → km/h sau mph)
     windSpeed(mps) {
-        if (this.units === 'imperial') {
-            return (mps * 2.237).toFixed(1); // m/s to mph
-        }
-        return (mps * 3.6).toFixed(1); // m/s to km/h
+        return this.units === 'imperial' ? (mps * 2.237).toFixed(1) : (mps * 3.6).toFixed(1);
     }
 
-    // Simbol unitate de temperatură
     tempUnit() {
         return this.units === 'imperial' ? '°F' : '°C';
     }
 
-    // Simbol unitate de vânt
     windUnit() {
         return this.units === 'imperial' ? 'mph' : 'km/h';
     }
-
-    // Simbol unitate de presiune
-    pressureUnit() {
-        return 'hPa';
-    }
 }
 
+// ============================================================================
+// CACHE MANAGER
+// ============================================================================
+
 class CacheManager {
-    constructor(maxSize = 10, ttl = 3600000) { // TTL: 1 oră în ms
+    constructor(ttlMinutes = 60) {
         this.cache = new Map();
-        this.maxSize = maxSize;
-        this.ttl = ttl;
+        this.ttl = ttlMinutes * 60 * 1000;
         this.loadFromStorage();
     }
 
-    // Stocare în cache cu timestamp
     set(key, value) {
-        const cacheEntry = {
-            value,
-            timestamp: Date.now()
-        };
-
-        // Elimina intrarea cea mai veche dacă am ajuns la maxSize
-        if (this.cache.size >= this.maxSize) {
-            const firstKey = this.cache.keys().next().value;
-            this.cache.delete(firstKey);
-        }
-
-        this.cache.set(key, cacheEntry);
+        this.cache.set(key, { value, timestamp: Date.now() });
         this.saveToStorage();
     }
 
-    // Preluare din cache cu verificare TTL
     get(key) {
         const entry = this.cache.get(key);
-        
         if (!entry) return null;
-
-        // Verifică dacă data a expirat
         if (Date.now() - entry.timestamp > this.ttl) {
             this.cache.delete(key);
-            this.saveToStorage();
             return null;
         }
-
         return entry.value;
     }
 
-    // Verifică dacă există în cache
     has(key) {
-        return this.cache.has(key) && this.get(key) !== null;
+        return this.get(key) !== null;
     }
 
-    // Gol cache
     clear() {
         this.cache.clear();
         localStorage.removeItem('weatherAppCache');
     }
 
-    // Salvează cache în localStorage
     saveToStorage() {
         const data = Array.from(this.cache.entries()).map(([key, entry]) => ({
-            key,
-            value: entry.value,
-            timestamp: entry.timestamp
+            key, value: entry.value, timestamp: entry.timestamp
         }));
         localStorage.setItem('weatherAppCache', JSON.stringify(data));
     }
 
-    // Încarcă cache din localStorage
     loadFromStorage() {
         const stored = localStorage.getItem('weatherAppCache');
         if (stored) {
             try {
-                const data = JSON.parse(stored);
-                data.forEach(({ key, value, timestamp }) => {
-                    // Verifică TTL la încărcare
+                JSON.parse(stored).forEach(({ key, value, timestamp }) => {
                     if (Date.now() - timestamp <= this.ttl) {
                         this.cache.set(key, { value, timestamp });
                     }
                 });
             } catch (e) {
-                console.error('Eroare la încărcarea cache-ului:', e);
-                this.clear();
+                console.error('Cache load error:', e);
             }
         }
     }
 }
 
 // ============================================================================
-// DEBOUNCE UTILITY - Pentru a evita apeluri API inutile
+// DEBOUNCE UTILITY
 // ============================================================================
 
 function debounce(func, wait = 500) {
@@ -155,7 +115,7 @@ function debounce(func, wait = 500) {
 }
 
 // ============================================================================
-// API SERVICE - Gestionarea apelurilor API
+// API SERVICE
 // ============================================================================
 
 class WeatherAPIService {
@@ -163,129 +123,87 @@ class WeatherAPIService {
         this.cache = new CacheManager();
     }
 
-    // Get current weather by coordinates using Open-Meteo
     async getWeatherByCoords(lat, lon) {
         const cacheKey = `weather_${lat}_${lon}`;
-        
         if (this.cache.has(cacheKey)) {
-            console.log('✓ Meteo curentă preluată din cache:', { lat, lon });
+            console.log('✓ Current weather from cache');
             return this.cache.get(cacheKey);
         }
 
         try {
-            const url = new URL(`${API_CONFIG.BASE_URL}/forecast`, window.location.origin);
-            url.href = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,weather_description,wind_speed_10m,pressure_msl&timezone=auto`;
-            
-            const response = await fetch(url.href);
-            if (!response.ok) throw new Error(`API Error: ${response.status}`);
-            
-            const data = await response.json();
-            this.cache.set(cacheKey, data);
-            
-            console.log('✓ Meteo curentă preluată din API');
-            return data;
-        } catch (error) {
-            throw this.handleError(error, 'obținerea datelor meteo curente');
-        }
-    }
-
-    // Get forecast by coordinates using Open-Meteo
-    async getForecast5Days(lat, lon) {
-        const cacheKey = `forecast5_${lat}_${lon}`;
-        
-        if (this.cache.has(cacheKey)) {
-            console.log('✓ Prognoză preluată din cache:', { lat, lon });
-            return this.cache.get(cacheKey);
-        }
-
-        try {
-            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto&forecast_days=7`;
-            
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,pressure_msl&timezone=auto`;
             const response = await fetch(url);
             if (!response.ok) throw new Error(`API Error: ${response.status}`);
-            
             const data = await response.json();
             this.cache.set(cacheKey, data);
-            
-            console.log('✓ Prognoză preluată din API');
+            console.log('✓ Current weather from API');
             return data;
         } catch (error) {
-            throw this.handleError(error, 'obținerea prognozei');
+            console.error('Current weather fetch error:', error);
+            throw new Error('Unable to fetch current weather. Please try again.');
         }
     }
 
-    // Alias for compatibility
     async getForecast7Days(lat, lon) {
-        return this.getForecast5Days(lat, lon);
+        const cacheKey = `forecast_${lat}_${lon}`;
+        if (this.cache.has(cacheKey)) {
+            console.log('✓ Forecast from cache');
+            return this.cache.get(cacheKey);
+        }
+
+        try {
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max&timezone=auto&forecast_days=7`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`API Error: ${response.status}`);
+            const data = await response.json();
+            this.cache.set(cacheKey, data);
+            console.log('✓ Forecast from API');
+            return data;
+        } catch (error) {
+            console.error('Forecast fetch error:', error);
+            throw new Error('Unable to fetch forecast data. Please try again.');
+        }
     }
 
-    // Geocode city name to coordinates
     async getCoordinatesByCity(cityName) {
         const cacheKey = `coords_${cityName.toLowerCase()}`;
-        
         if (this.cache.has(cacheKey)) {
-            console.log('✓ Coordonate preluate din cache:', cityName);
+            console.log('✓ Coordinates from cache:', cityName);
             return this.cache.get(cacheKey);
         }
 
         try {
-            const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=5&language=en&format=json`;
-            
+            const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=10&language=en&format=json`;
             const response = await fetch(url);
             if (!response.ok) throw new Error(`API Error: ${response.status}`);
-            
             const data = await response.json();
             
             if (!data.results || data.results.length === 0) {
-                throw new Error(`Niciun rezultat găsit pentru "${cityName}"`);
+                throw new Error(`No results found for "${cityName}"`);
             }
-
+            
             this.cache.set(cacheKey, data.results);
+            console.log('✓ Coordinates from API');
             return data.results;
         } catch (error) {
-            throw this.handleError(error, `căutarea orașului "${cityName}"`);
+            console.error('Geocoding fetch error:', error);
+            throw new Error(`City not found: "${cityName}". Please try another search.`);
         }
-    }
-
-    // Error handling
-    handleError(error, action) {
-        let userMessage = `Eroare la ${action}`;
-        let errorType = 'error';
-
-        if (error instanceof TypeError) {
-            userMessage = 'Eroare de conexiune. Verificați conexiunea la internet.';
-        } else if (error.message.includes('404')) {
-            userMessage = 'Orașul nu a fost găsit. Încercați cu alt nume.';
-            errorType = 'warning';
-        } else if (error.message.includes('Niciun rezultat')) {
-            userMessage = error.message;
-            errorType = 'warning';
-        }
-
-        const customError = new Error(userMessage);
-        customError.type = errorType;
-        console.error('API Error:', error);
-        return customError;
     }
 }
 
 // ============================================================================
-// DOM ELEMENT MAPPING - Mapare API la UI pentru claritate
+// DOM MAPPING
 // ============================================================================
 
 const DOM_MAPPING = {
-    // Search & Input Elements
     search: {
         input: document.getElementById('searchInput'),
         button: document.getElementById('searchBtn'),
         suggestions: document.getElementById('suggestions')
     },
-
-    // Error & Loading
     errorMessage: document.getElementById('errorMessage'),
     loadingSpinner: document.getElementById('loadingSpinner'),
-
-    // Current Weather Elements
     currentWeather: {
         container: document.getElementById('currentWeather'),
         cityName: document.getElementById('cityName'),
@@ -293,8 +211,6 @@ const DOM_MAPPING = {
         temperature: document.getElementById('temperature'),
         description: document.getElementById('weatherDescription'),
         icon: document.getElementById('weatherIcon'),
-        
-        // Weather Details
         details: {
             windSpeed: document.getElementById('windSpeed'),
             humidity: document.getElementById('humidity'),
@@ -302,31 +218,13 @@ const DOM_MAPPING = {
             pressure: document.getElementById('pressure')
         }
     },
-
-    // Forecast Elements
     forecast: {
         container: document.getElementById('forecastContainer'),
         section: document.querySelector('.forecast-section')
     },
-
-    // Recent Searches
     recentSearches: {
         container: document.getElementById('recentSearches')
     }
-};
-
-// Mapare câmpuri API la elemente UI
-const API_TO_UI_MAPPING = {
-    // Current weather mapping
-    'name': 'currentWeather.cityName',
-    'main.temp': 'currentWeather.temperature',
-    'main.feels_like': 'currentWeather.details.feelsLike',
-    'main.humidity': 'currentWeather.details.humidity',
-    'main.pressure': 'currentWeather.details.pressure',
-    'wind.speed': 'currentWeather.details.windSpeed',
-    'weather[0].description': 'currentWeather.description',
-    'weather[0].icon': 'currentWeather.icon',
-    'dt': 'currentWeather.date'
 };
 
 // ============================================================================
@@ -340,12 +238,10 @@ class WeatherApp {
         this.recentSearches = this.loadRecentSearches();
         this.currentCoordinates = null;
         this.lastCity = null;
-        
+
         this.initializeEventListeners();
         this.displayRecentSearches();
         this.initializeUnitsSelector();
-        
-        // Hide any initial errors
         this.hideError();
     }
 
@@ -355,20 +251,14 @@ class WeatherApp {
 
     initializeUnitsSelector() {
         const unitsBtn = document.getElementById('unitsToggle');
-        if (!unitsBtn) {
-            console.warn('⚠️ Element unitsToggle nu găsit în HTML');
-            return;
-        }
+        if (!unitsBtn) return;
 
         this.updateUnitsButton();
-
         unitsBtn.addEventListener('click', () => {
             const newUnits = this.units.units === 'metric' ? 'imperial' : 'metric';
             this.units.setUnits(newUnits);
             API_CONFIG.UNITS = newUnits;
             this.updateUnitsButton();
-            
-            // Reîncarcă datele meteo cu noile unități
             if (this.currentCoordinates) {
                 this.fetchWeatherData();
             }
@@ -378,26 +268,20 @@ class WeatherApp {
     updateUnitsButton() {
         const unitsBtn = document.getElementById('unitsToggle');
         if (unitsBtn) {
-            const display = this.units.units === 'metric' ? '°C / km/h' : '°F / mph';
-            unitsBtn.textContent = display;
-            unitsBtn.setAttribute('data-units', this.units.units);
+            const unit = this.units.units === 'metric' ? '°C / km/h' : '°F / mph';
+            unitsBtn.querySelector('span').textContent = unit;
         }
     }
 
     initializeEventListeners() {
-        // Search input cu debounce pentru sugestii
-        const debouncedSearch = debounce(() => this.handleSearchSuggestions(), 300);
+        const debouncedSearch = debounce(() => this.handleSearch(), 300);
+        
         DOM_MAPPING.search.input.addEventListener('input', debouncedSearch);
-
-        // Search button click
         DOM_MAPPING.search.button.addEventListener('click', () => this.handleSearch());
-
-        // Enter key în search input
         DOM_MAPPING.search.input.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.handleSearch();
         });
 
-        // Închidere sugestii la click afară
         document.addEventListener('click', (e) => {
             if (!DOM_MAPPING.search.suggestions.contains(e.target) && 
                 e.target !== DOM_MAPPING.search.input) {
@@ -407,13 +291,22 @@ class WeatherApp {
     }
 
     // ========================================================================
-    // SEARCH FUNCTIONALITY
+    // SEARCH & SUGGESTIONS
     // ========================================================================
 
-    async handleSearchSuggestions() {
+    async handleSearch() {
         const query = DOM_MAPPING.search.input.value.trim();
-        
-        if (query.length < 2) {
+        if (!query) {
+            this.showError('Please enter a city name', 'warning');
+            return;
+        }
+
+        this.currentCoordinates = null;
+        await this.fetchWeatherData(query);
+    }
+
+    async searchCities(query) {
+        if (!query || query.length < 2) {
             this.hideSuggestions();
             return;
         }
@@ -422,7 +315,7 @@ class WeatherApp {
             const results = await this.api.getCoordinatesByCity(query);
             this.displaySuggestions(results);
         } catch (error) {
-            // Nu afișa eroare pentru sugestii, doar ascunde lista
+            console.error('Search error:', error);
             this.hideSuggestions();
         }
     }
@@ -432,16 +325,11 @@ class WeatherApp {
         suggestions.innerHTML = '';
 
         results.forEach(result => {
-            // Open-Meteo format: name, admin1 (state/province), country
             const displayName = `${result.name}${result.admin1 ? ', ' + result.admin1 : ''}, ${result.country}`;
-            
             const item = document.createElement('div');
             item.className = 'suggestion-item';
             item.textContent = displayName;
-            item.dataset.lat = result.latitude;
-            item.dataset.lon = result.longitude;
-            item.dataset.name = result.name;
-            
+
             item.addEventListener('click', () => {
                 this.selectSuggestion(result);
             });
@@ -454,23 +342,19 @@ class WeatherApp {
 
     selectSuggestion(result) {
         DOM_MAPPING.search.input.value = result.name;
-        this.lastCity = result.name;
         this.hideSuggestions();
-        this.currentCoordinates = { lat: result.latitude, lon: result.longitude, name: result.name };
+        this.currentCoordinates = {
+            lat: result.latitude,
+            lon: result.longitude,
+            name: result.name
+        };
+        this.lastCity = result.name;
         this.fetchWeatherData();
     }
 
-    handleSearch() {
-        const query = DOM_MAPPING.search.input.value.trim();
-        
-        if (!query) {
-            this.showError('Vă rugăm să introduceți un oraș', 'warning');
-            return;
-        }
-
-        // Resetează coordonatele curente pentru a forța noua căutare
-        this.currentCoordinates = null;
-        this.fetchWeatherData(query);
+    hideSuggestions() {
+        DOM_MAPPING.search.suggestions.classList.remove('active');
+        DOM_MAPPING.search.suggestions.innerHTML = '';
     }
 
     // ========================================================================
@@ -482,45 +366,39 @@ class WeatherApp {
             this.showLoading(true);
             this.hideError();
 
-            // Get coordinates if not set
+            // Get coordinates if needed
             if (!this.currentCoordinates && cityName) {
                 const results = await this.api.getCoordinatesByCity(cityName);
                 const result = results[0];
-                this.currentCoordinates = { 
-                    lat: result.latitude, 
-                    lon: result.longitude, 
-                    name: result.name 
+                this.currentCoordinates = {
+                    lat: result.latitude,
+                    lon: result.longitude,
+                    name: result.name
                 };
                 this.lastCity = result.name;
             }
 
             if (!this.currentCoordinates) {
-                throw new Error('Coordonate indisponibile');
+                throw new Error('Coordinates unavailable');
             }
 
-            // Parallel fetch: weather and forecast
-            const [weatherData, forecastData] = await Promise.all([
-                this.api.getWeatherByCoords(
-                    this.currentCoordinates.lat, 
-                    this.currentCoordinates.lon
-                ),
-                this.api.getForecast5Days(
-                    this.currentCoordinates.lat, 
-                    this.currentCoordinates.lon
-                )
+            // Fetch current weather and 7-day forecast in parallel
+            const [currentData, forecastData] = await Promise.all([
+                this.api.getWeatherByCoords(this.currentCoordinates.lat, this.currentCoordinates.lon),
+                this.api.getForecast7Days(this.currentCoordinates.lat, this.currentCoordinates.lon)
             ]);
 
             // Display data
-            this.displayCurrentWeather(weatherData);
+            this.displayCurrentWeather(currentData);
             this.displayForecast(forecastData);
 
-            // Add to recent searches
+            // Save to recent searches
             this.addToRecentSearches(this.currentCoordinates.name);
-            
-            console.log('✓ Datele meteo au fost încărcate cu succes');
+
+            console.log('✓ Weather data loaded successfully');
         } catch (error) {
             console.error('Fetch error:', error);
-            this.showError(error.message || 'Eroare la încărcarea datelor', error.type || 'error');
+            this.showError(error.message || 'Failed to load weather data');
         } finally {
             this.showLoading(false);
         }
@@ -531,44 +409,36 @@ class WeatherApp {
     // ========================================================================
 
     displayCurrentWeather(data) {
-        // Open-Meteo current data structure
         const current = data.current;
-        const tempCelsius = current.temperature_2m;
+        const temp = this.units.temperature(current.temperature_2m);
         const humidity = current.relative_humidity_2m;
-        const pressure = current.pressure_msl;
         const windSpeedMs = current.wind_speed_10m;
-        const description = current.weather_description || 'Clear';
-        const date = this.formatDate(new Date());
+        const windSpeed = this.units.windSpeed(windSpeedMs);
+        const pressure = current.pressure_msl;
+        const weatherCode = current.weather_code;
+        const description = this.getWeatherDescription(weatherCode);
+        const date = new Date().toLocaleDateString('ro-RO', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
 
-        // Unit conversions
-        const temp = this.units.temperature(tempCelsius);
-        const windSpeed = this.units.windSpeed(windSpeedMs / 3.6); // Convert km/h to m/s
         const tempUnit = this.units.tempUnit();
         const windUnit = this.units.windUnit();
 
-        // Update DOM
         DOM_MAPPING.currentWeather.cityName.textContent = this.lastCity || 'Weather';
         DOM_MAPPING.currentWeather.temperature.textContent = `${temp}${tempUnit}`;
         DOM_MAPPING.currentWeather.description.textContent = description;
         DOM_MAPPING.currentWeather.date.textContent = date;
-        
-        // Use a generic weather icon
         DOM_MAPPING.currentWeather.icon.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="30" r="20" fill="%23FFD700"/><path d="M20 50 Q20 65 35 70 Q50 75 50 75 Q50 75 65 70 Q80 65 80 50" fill="%2387CEEB"/></svg>';
-        DOM_MAPPING.currentWeather.icon.alt = description;
-
         DOM_MAPPING.currentWeather.details.windSpeed.textContent = `${windSpeed} ${windUnit}`;
         DOM_MAPPING.currentWeather.details.humidity.textContent = `${humidity}%`;
         DOM_MAPPING.currentWeather.details.feelsLike.textContent = `${temp}${tempUnit}`;
         DOM_MAPPING.currentWeather.details.pressure.textContent = `${Math.round(pressure)} hPa`;
 
-        console.log('📊 Meteo curentă afișată:', {
-            temperature: `${temp}${tempUnit}`,
-            humidity: `${humidity}%`,
-            pressure: `${pressure}hPa`,
-            windSpeed: `${windSpeed}${windUnit}`
-        });
-
         DOM_MAPPING.currentWeather.container.classList.add('show');
+        console.log('📊 Current weather displayed');
     }
 
     // ========================================================================
@@ -579,25 +449,23 @@ class WeatherApp {
         const container = DOM_MAPPING.forecast.container;
         container.innerHTML = '';
 
-        // Open-Meteo daily forecast
         const daily = data.daily;
-        console.log('📊 Forecast data received:', data);
-        console.log('📊 Daily data:', daily);
-        if (!daily || !daily.time) {
-            console.warn('No forecast data available', { daily, data });
+        if (!daily || !daily.time || daily.time.length === 0) {
+            console.warn('No forecast data available');
             return;
         }
 
-        // Display up to 7 days
+        console.log('📊 Forecast data:', daily);
+
         for (let i = 0; i < Math.min(7, daily.time.length); i++) {
             const card = document.createElement('div');
             card.className = 'forecast-card';
 
             const date = new Date(daily.time[i]);
-            const dateStr = date.toLocaleDateString('ro-RO', { 
-                weekday: 'short', 
-                month: 'short', 
-                day: 'numeric' 
+            const dateStr = date.toLocaleDateString('ro-RO', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric'
             });
 
             const tempMax = this.units.temperature(daily.temperature_2m_max[i]);
@@ -619,36 +487,23 @@ class WeatherApp {
             container.appendChild(card);
         }
 
-        console.log(`✓ Prognoză ${Math.min(7, daily.time.length)} zile afișate`);
+        console.log(`✓ 7-day forecast displayed`);
         DOM_MAPPING.forecast.section.classList.add('show');
     }
 
-    // Convert WMO weather code to description
+    // ========================================================================
+    // WEATHER DESCRIPTION
+    // ========================================================================
+
     getWeatherDescription(code) {
         const descriptions = {
-            0: 'Clear sky',
-            1: 'Mainly clear',
-            2: 'Partly cloudy',
-            3: 'Overcast',
-            45: 'Foggy',
-            48: 'Foggy',
-            51: 'Light drizzle',
-            53: 'Moderate drizzle',
-            55: 'Dense drizzle',
-            61: 'Slight rain',
-            63: 'Moderate rain',
-            65: 'Heavy rain',
-            71: 'Slight snow',
-            73: 'Moderate snow',
-            75: 'Heavy snow',
-            80: 'Slight showers',
-            81: 'Moderate showers',
-            82: 'Violent showers',
-            85: 'Slight snow showers',
-            86: 'Heavy snow showers',
-            95: 'Thunderstorm',
-            96: 'Thunderstorm with hail',
-            99: 'Thunderstorm with hail'
+            0: 'Clear', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
+            45: 'Foggy', 48: 'Foggy', 51: 'Light drizzle', 53: 'Moderate drizzle',
+            55: 'Dense drizzle', 61: 'Slight rain', 63: 'Moderate rain', 65: 'Heavy rain',
+            71: 'Slight snow', 73: 'Moderate snow', 75: 'Heavy snow',
+            80: 'Slight showers', 81: 'Moderate showers', 82: 'Violent showers',
+            85: 'Snow showers', 86: 'Heavy snow', 95: 'Thunderstorm',
+            96: 'Thunderstorm', 99: 'Thunderstorm'
         };
         return descriptions[code] || 'Unknown';
     }
@@ -658,15 +513,10 @@ class WeatherApp {
     // ========================================================================
 
     addToRecentSearches(cityName) {
-        // Elimina duplicat dacă există
+        if (!cityName) return;
         this.recentSearches = this.recentSearches.filter(c => c !== cityName);
-        
-        // Adaugă la început
         this.recentSearches.unshift(cityName);
-        
-        // Ține maxim 10 cautari
-        this.recentSearches = this.recentSearches.slice(0, 10);
-        
+        this.recentSearches = this.recentSearches.slice(0, 5);
         this.saveRecentSearches();
         this.displayRecentSearches();
     }
@@ -676,31 +526,23 @@ class WeatherApp {
         container.innerHTML = '';
 
         if (this.recentSearches.length === 0) {
-            container.innerHTML = '<p class="empty-message">Nu aveți căutări recente</p>';
+            container.innerHTML = '<p style="text-align: center; color: #999;">No recent searches</p>';
             return;
         }
 
         this.recentSearches.forEach(cityName => {
-            const tag = document.createElement('div');
+            const tag = document.createElement('button');
             tag.className = 'recent-search-tag';
-            
-            const nameSpan = document.createElement('span');
-            nameSpan.textContent = cityName;
-            
-            const removeBtn = document.createElement('span');
-            removeBtn.className = 'remove';
-            removeBtn.textContent = '✕';
+            tag.textContent = cityName;
 
-            tag.appendChild(nameSpan);
-            tag.appendChild(removeBtn);
-
-            // Click pe tag pentru a căuta
-            nameSpan.addEventListener('click', () => {
+            tag.addEventListener('click', () => {
                 DOM_MAPPING.search.input.value = cityName;
-                this.handleSearch();
+                this.currentCoordinates = null;
+                this.fetchWeatherData(cityName);
             });
 
-            // Click pe X pentru a șterge
+            const removeBtn = document.createElement('i');
+            removeBtn.className = 'fas fa-times';
             removeBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.recentSearches = this.recentSearches.filter(c => c !== cityName);
@@ -708,6 +550,7 @@ class WeatherApp {
                 this.displayRecentSearches();
             });
 
+            tag.appendChild(removeBtn);
             container.appendChild(tag);
         });
     }
@@ -730,12 +573,9 @@ class WeatherApp {
             this.hideError();
             return;
         }
-        
         const errorEl = DOM_MAPPING.errorMessage;
         errorEl.textContent = message;
         errorEl.className = `error-message show ${type}`;
-        
-        // Auto-hide after 5 seconds for warnings
         if (type === 'warning') {
             setTimeout(() => this.hideError(), 5000);
         }
@@ -751,32 +591,18 @@ class WeatherApp {
     showLoading(show) {
         DOM_MAPPING.loadingSpinner.classList.toggle('show', show);
     }
-
-    // ========================================================================
-    // UTILITIES
-    // ========================================================================
-
-    getWeatherIcon(iconCode) {
-        return `https://openweathermap.org/img/wn/${iconCode}@4x.png`;
-    }
-
-    formatDate(date) {
-        return date.toLocaleDateString('ro-RO', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    }
 }
 
 // ============================================================================
-// INITIALIZATION
+// INITIALIZE APP
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Pornește aplicația
-    new WeatherApp();
+    const app = new WeatherApp();
+    
+    const debouncedSearch = debounce(() => {
+        app.searchCities(DOM_MAPPING.search.input.value.trim());
+    }, 300);
+    
+    DOM_MAPPING.search.input.addEventListener('input', debouncedSearch);
 });
