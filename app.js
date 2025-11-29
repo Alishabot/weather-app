@@ -576,9 +576,10 @@ class WeatherApp {
         const errorEl = DOM_MAPPING.errorMessage;
         errorEl.textContent = message;
         errorEl.className = `error-message show ${type}`;
-        if (type === 'warning') {
-            setTimeout(() => this.hideError(), 5000);
-        }
+        console.error(`[${type.toUpperCase()}] ${message}`);
+        
+        // Auto-hide all errors after 8 seconds
+        setTimeout(() => this.hideError(), 8000);
     }
 
     hideError() {
