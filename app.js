@@ -4,10 +4,10 @@
 
 // API Configuration
 const API_CONFIG = {
-    BASE_URL: 'https://api.openweathermap.org/data/2.5',
-    GEO_URL: 'https://api.openweathermap.org/geo/1.0',
-    // Înlocuiți cu cheia dvs API de la openweathermap.org
-    API_KEY: 'YOUR_API_KEY_HERE', // De la https://openweathermap.org/api
+    // Use serverless function to hide API key
+    BASE_URL: '/api/weather',
+    GEO_URL: '/api/weather',
+    API_KEY: '', // Hidden in serverless function
     UNITS: 'metric', // 'metric' (°C, km/h) sau 'imperial' (°F, mph)
     LANG: 'ro', // Limba pentru descrieri
     FORECAST_DAYS: 7 // Prognoză pe 7 zile
@@ -165,10 +165,10 @@ class WeatherAPIService {
         this.cache = new CacheManager();
     }
 
-    // Construiește URL-ul complet pentru apel API
+    // Construiește URL-ul complet pentru apel API (proxy serverless)
     buildUrl(endpoint, params) {
-        const url = new URL(endpoint, API_CONFIG.BASE_URL);
-        url.searchParams.append('appid', API_CONFIG.API_KEY);
+        const url = new URL(API_CONFIG.BASE_URL);
+        url.searchParams.append('endpoint', endpoint);
         url.searchParams.append('units', API_CONFIG.UNITS);
         url.searchParams.append('lang', API_CONFIG.LANG);
         
