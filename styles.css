@@ -290,10 +290,21 @@ body {
     animation: slideDown 0.3s ease;
     align-items: center;
     gap: var(--spacing-md);
+    visibility: hidden !important;
+    opacity: 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
 }
 
 .error-message.show {
-    display: flex;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
+    margin-bottom: var(--spacing-lg) !important;
+    padding: var(--spacing-lg) !important;
 }
 
 .error-message.warning {
@@ -310,7 +321,7 @@ body {
 }
 
 .loading-spinner {
-    display: none;
+    display: none !important;
     width: 50px;
     height: 50px;
     border: 4px solid rgba(255, 255, 255, 0.3);
@@ -318,10 +329,14 @@ body {
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin: var(--spacing-xl) auto;
+    visibility: hidden !important;
+    opacity: 0 !important;
 }
 
 .loading-spinner.show {
-    display: block;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 @keyframes spin {
