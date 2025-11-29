@@ -9,7 +9,8 @@ const API_CONFIG = {
     API_KEY: '42e6e8424170dc2c2a166bac7f1fa180',
     UNITS: 'metric', // 'metric' (°C, km/h) sau 'imperial' (°F, mph)
     LANG: 'ro', // Limba pentru descrieri
-    FORECAST_DAYS: 7 // Prognoză pe 7 zile
+    FORECAST_DAYS: 7, // Prognoză pe 7 zile
+    CORS_PROXY: 'https://api.allorigins.win/raw?url=' // CORS proxy for direct API access
 };
 
 // ============================================================================
@@ -164,7 +165,7 @@ class WeatherAPIService {
         this.cache = new CacheManager();
     }
 
-    // Construiește URL-ul complet pentru apel API
+    // Construiește URL-ul complet pentru apel API cu CORS proxy
     buildUrl(endpoint, params) {
         const url = new URL(endpoint, API_CONFIG.BASE_URL);
         url.searchParams.append('appid', API_CONFIG.API_KEY);
@@ -175,7 +176,8 @@ class WeatherAPIService {
             url.searchParams.append(key, value);
         });
         
-        return url.toString();
+        // Use CORS proxy to bypass browser CORS restrictions
+        return API_CONFIG.CORS_PROXY + encodeURIComponent(url.toString());
     }
 
     // Preluare date meteo CURENTE după coordonate (endpoint /weather)
