@@ -4,8 +4,8 @@
 
 // API Configuration
 const API_CONFIG = {
-    BASE_URL: '/api/weather',
-    GEO_URL: '/api/geo',
+    BASE_URL: 'https://api.openweathermap.org/data/2.5',
+    GEO_URL: 'https://api.openweathermap.org/geo/1.0',
     API_KEY: '42e6e8424170dc2c2a166bac7f1fa180',
     UNITS: 'metric', // 'metric' (°C, km/h) sau 'imperial' (°F, mph)
     LANG: 'ro', // Limba pentru descrieri
@@ -164,10 +164,10 @@ class WeatherAPIService {
         this.cache = new CacheManager();
     }
 
-    // Construiește URL-ul complet pentru apel API via serverless proxy
+    // Construiește URL-ul complet pentru apel API
     buildUrl(endpoint, params) {
-        const url = new URL(API_CONFIG.BASE_URL);
-        url.searchParams.append('endpoint', endpoint);
+        const url = new URL(endpoint, API_CONFIG.BASE_URL);
+        url.searchParams.append('appid', API_CONFIG.API_KEY);
         url.searchParams.append('units', API_CONFIG.UNITS);
         url.searchParams.append('lang', API_CONFIG.LANG);
         
@@ -329,9 +329,10 @@ class WeatherAPIService {
         }
 
         try {
-            const url = new URL(API_CONFIG.GEO_URL);
+            const url = new URL('/direct', API_CONFIG.GEO_URL);
             url.searchParams.append('q', cityName);
             url.searchParams.append('limit', '5');
+            url.searchParams.append('appid', API_CONFIG.API_KEY);
             
             const response = await fetch(url.toString());
             
