@@ -4,13 +4,12 @@
 
 // API Configuration
 const API_CONFIG = {
-    BASE_URL: 'https://api.openweathermap.org/data/2.5',
-    GEO_URL: 'https://api.openweathermap.org/geo/1.0',
-    API_KEY: '42e6e8424170dc2c2a166bac7f1fa180',
+    BASE_URL: '/api/weather',
+    GEO_URL: '/api/geo',
+    API_KEY: '42e6e8424170dc2c2a166bac7f1fa180', // Used only in server-side
     UNITS: 'metric', // 'metric' (°C, km/h) sau 'imperial' (°F, mph)
     LANG: 'ro', // Limba pentru descrieri
-    FORECAST_DAYS: 7, // Prognoză pe 7 zile
-    CORS_PROXY: 'https://api.allorigins.win/raw?url=' // CORS proxy for direct API access
+    FORECAST_DAYS: 7 // Prognoză pe 7 zile
 };
 
 // ============================================================================
@@ -165,19 +164,17 @@ class WeatherAPIService {
         this.cache = new CacheManager();
     }
 
-    // Construiește URL-ul complet pentru apel API cu CORS proxy
+    // Construiește URL-ul complet pentru apel API (via backend proxy)
     buildUrl(endpoint, params) {
         const url = new URL(endpoint, API_CONFIG.BASE_URL);
-        url.searchParams.append('appid', API_CONFIG.API_KEY);
-        url.searchParams.append('units', API_CONFIG.UNITS);
-        url.searchParams.append('lang', API_CONFIG.LANG);
         
         Object.entries(params).forEach(([key, value]) => {
-            url.searchParams.append(key, value);
+            if (value !== undefined) {
+                url.searchParams.append(key, value);
+            }
         });
         
-        // Use CORS proxy to bypass browser CORS restrictions
-        return API_CONFIG.CORS_PROXY + encodeURIComponent(url.toString());
+        return url.toString();
     }
 
     // Preluare date meteo CURENTE după coordonate (endpoint /weather)
@@ -332,7 +329,6 @@ class WeatherAPIService {
             const url = new URL('/direct', API_CONFIG.GEO_URL);
             url.searchParams.append('q', cityName);
             url.searchParams.append('limit', '5');
-            url.searchParams.append('appid', API_CONFIG.API_KEY);
             
             const response = await fetch(url.toString());
             
