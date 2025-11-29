@@ -740,8 +740,10 @@ class WeatherApp {
     }
 
     hideError() {
-        DOM_MAPPING.errorMessage.classList.remove('show');
-        DOM_MAPPING.errorMessage.textContent = '';
+        const errorEl = DOM_MAPPING.errorMessage;
+        errorEl.classList.remove('show');
+        errorEl.textContent = '';
+        errorEl.style.display = 'none';
     }
 
     showLoading(show) {

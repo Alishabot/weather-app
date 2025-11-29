@@ -280,7 +280,7 @@ body {
    ============================================================================ */
 
 .error-message {
-    display: none;
+    display: none !important;
     padding: var(--spacing-lg);
     background: var(--danger);
     color: white;
