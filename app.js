@@ -940,18 +940,6 @@ class WeatherApp {
 // ============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Verifică cheie API
-    if (API_CONFIG.API_KEY === 'YOUR_API_KEY_HERE') {
-        const errorEl = DOM_MAPPING.errorMessage;
-        errorEl.innerHTML = `
-            <strong>⚠️ Configurare necesară:</strong><br>
-            Vă rugăm să înlocuiți <code>YOUR_API_KEY_HERE</code> cu cheia dvs API de la 
-            <a href="https://openweathermap.org/api" target="_blank" style="color: white; text-decoration: underline;">OpenWeatherMap</a>
-        `;
-        errorEl.classList.add('show', 'error');
-        return;
-    }
-
     // Pornește aplicația
     new WeatherApp();
 });
