@@ -492,7 +492,7 @@ body {
     border-radius: var(--radius-2xl);
     padding: var(--spacing-2xl);
     box-shadow: var(--shadow-lg);
-    display: none;
+    display: none !important;
     position: relative;
 }
 
