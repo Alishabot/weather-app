@@ -581,8 +581,10 @@ class WeatherApp {
 
         // Open-Meteo daily forecast
         const daily = data.daily;
+        console.log('📊 Forecast data received:', data);
+        console.log('📊 Daily data:', daily);
         if (!daily || !daily.time) {
-            console.warn('No forecast data available');
+            console.warn('No forecast data available', { daily, data });
             return;
         }
 
