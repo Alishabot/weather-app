@@ -618,7 +618,8 @@ class WeatherApp {
         }
 
         console.log(`✓ Prognoză ${Math.min(7, daily.time.length)} zile afișate`);
-        DOM_MAPPING.forecast.section.classList.add('show');
+        // Hide forecast section - not showing details
+        // DOM_MAPPING.forecast.section.classList.add('show');
     }
 
     // Convert WMO weather code to description
