@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meteo Aplicație - Weather App</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="wrapper">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <i class="fas fa-cloud-sun"></i>
+                    <h1>Weather App</h1>
+                </div>
+                <button id="unitsToggle" class="units-toggle" title="Schimbă între metric și imperial">
+                    <i class="fas fa-thermometer-half"></i>
+                    <span>°C / km/h</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="container">
+
+        <!-- Search Section -->
+        <section class="search-section">
+            <div class="search-wrapper">
+                <div class="search-container">
+                    <i class="fas fa-location-dot"></i>
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        class="search-input" 
+                        placeholder="Cauta o oraș (ex: București, Constanța)..."
+                        autocomplete="off"
+                    >
+                    <button id="searchBtn" class="search-btn" title="Cauta">
+                        <i class="fas fa-magnifying-glass"></i>
+                    </button>
+                </div>
+                <div id="suggestions" class="suggestions-list"></div>
+            </div>
+        </section>
+
+        <!-- Error Message -->
+        <div id="errorMessage" class="error-message"></div>
+
+        <!-- Loading Indicator -->
+        <div id="loadingSpinner" class="loading-spinner"></div>
+
+        <!-- Main Content Grid -->
+        <main class="main-content">
+            <!-- Current Weather Card -->
+            <section id="currentWeather" class="weather-card current-weather">
+                <div class="weather-header">
+                    <h2 id="cityName" class="city-name"></h2>
+                    <p id="weatherDate" class="weather-date"></p>
+                </div>
+                <div class="weather-body">
+                    <div class="temperature-section">
+                        <div id="temperature" class="temperature"></div>
+                        <div id="weatherDescription" class="weather-description"></div>
+                    </div>
+                    <div class="icon-section">
+                        <img id="weatherIcon" class="weather-icon" alt="Weather icon">
+                    </div>
+                </div>
+                <div class="weather-details-grid">
+                    <div class="detail-item">
+                        <span class="detail-label">💨 Vânt</span>
+                        <span id="windSpeed" class="detail-value"></span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">💧 Umiditate</span>
+                        <span id="humidity" class="detail-value"></span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">🌡️ Senzație</span>
+                        <span id="feelsLike" class="detail-value"></span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">🔽 Presiune</span>
+                        <span id="pressure" class="detail-value"></span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Forecast Section -->
+            <section class="forecast-section">
+                <h3>Prognoza 5 Zile</h3>
+                <div id="forecastContainer" class="forecast-grid"></div>
+            </section>
+        </main>
+
+        <!-- Recent Searches -->
+        <section class="recent-searches">
+            <h3>Cautari Recente</h3>
+            <div id="recentSearches" class="recent-searches-list"></div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p><i class="fas fa-cloud"></i> Meteo în Timp Real - Powered by OpenWeatherMap API</p>
+            <p class="footer-info">© 2025 Weather App | Design inspirat de Becoder</p>
+        </footer>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
