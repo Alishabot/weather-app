@@ -339,10 +339,14 @@ class WeatherApp {
         this.units = new UnitsConverter(API_CONFIG.UNITS);
         this.recentSearches = this.loadRecentSearches();
         this.currentCoordinates = null;
+        this.lastCity = null;
         
         this.initializeEventListeners();
         this.displayRecentSearches();
         this.initializeUnitsSelector();
+        
+        // Hide any initial errors
+        this.hideError();
     }
 
     // ========================================================================
@@ -519,16 +523,6 @@ class WeatherApp {
             this.showError(error.message || 'Eroare la încărcarea datelor', error.type || 'error');
         } finally {
             this.showLoading(false);
-        }
-    }
-
-            // Succes
-            this.showLoading(false);
-
-        } catch (error) {
-            this.showLoading(false);
-            this.showError(error.message, error.type || 'error');
-            console.error('Error fetching weather:', error);
         }
     }
 
@@ -730,16 +724,24 @@ class WeatherApp {
     // ========================================================================
 
     showError(message, type = 'error') {
+        if (!message || message.trim() === '') {
+            this.hideError();
+            return;
+        }
+        
         const errorEl = DOM_MAPPING.errorMessage;
         errorEl.textContent = message;
         errorEl.className = `error-message show ${type}`;
         
-        // Auto-ascunde după 5 secunde
-        setTimeout(() => this.hideError(), 5000);
+        // Auto-hide after 5 seconds for warnings
+        if (type === 'warning') {
+            setTimeout(() => this.hideError(), 5000);
+        }
     }
 
     hideError() {
         DOM_MAPPING.errorMessage.classList.remove('show');
+        DOM_MAPPING.errorMessage.textContent = '';
     }
 
     showLoading(show) {
