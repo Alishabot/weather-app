@@ -187,7 +187,11 @@ class WeatherAPIService {
             return data.results;
         } catch (error) {
             console.error('Geocoding fetch error:', error);
-            throw new Error(`City not found: "${cityName}". Please try another search.`);
+            const isNetworkError = error.message.includes('fetch') || error.message.includes('Network');
+            if (isNetworkError) {
+                throw new Error(`Connection failed. Please check your internet and try again.`);
+            }
+            throw new Error(`City not found: "${cityName}". Try another search.`);
         }
     }
 }
